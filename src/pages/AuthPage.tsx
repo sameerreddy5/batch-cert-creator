@@ -26,8 +26,10 @@ type LoginForm = z.infer<typeof loginSchema>;
 type SignupForm = z.infer<typeof signupSchema>;
 
 export const AuthPage = () => {
-  const { user, signIn, signUp } = useAuth();
+  const { user, signIn, signUp, resendConfirmation } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [showResendConfirmation, setShowResendConfirmation] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState('');
 
   const loginForm = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -46,11 +48,21 @@ export const AuthPage = () => {
     try {
       const { error } = await signIn(data.email, data.password);
       if (error) {
-        toast({
-          title: 'Login failed',
-          description: error.message,
-          variant: 'destructive',
-        });
+        if (error.message?.includes('Email not confirmed')) {
+          setPendingEmail(data.email);
+          setShowResendConfirmation(true);
+          toast({
+            title: 'Email not confirmed',
+            description: 'Please check your email and click the confirmation link, or resend confirmation.',
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Login failed',
+            description: error.message,
+            variant: 'destructive',
+          });
+        }
       } else {
         toast({
           title: 'Login successful',
@@ -79,6 +91,8 @@ export const AuthPage = () => {
           variant: 'destructive',
         });
       } else {
+        setPendingEmail(data.email);
+        setShowResendConfirmation(true);
         toast({
           title: 'Signup successful',
           description: 'Please check your email to verify your account.',
@@ -87,6 +101,35 @@ export const AuthPage = () => {
     } catch (error) {
       toast({
         title: 'Signup failed',
+        description: 'An unexpected error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!pendingEmail) return;
+    
+    setIsLoading(true);
+    try {
+      const { error } = await resendConfirmation(pendingEmail);
+      if (error) {
+        toast({
+          title: 'Failed to resend',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Confirmation sent',
+          description: 'Please check your email for the new confirmation link.',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Failed to resend',
         description: 'An unexpected error occurred',
         variant: 'destructive',
       });
@@ -105,6 +148,21 @@ export const AuthPage = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {showResendConfirmation && (
+            <div className="mb-4 p-4 border border-orange-200 bg-orange-50 rounded-lg">
+              <p className="text-sm text-orange-800 mb-2">
+                Waiting for email confirmation for: <strong>{pendingEmail}</strong>
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleResendConfirmation}
+                disabled={isLoading}
+              >
+                {isLoading ? 'Resending...' : 'Resend Confirmation'}
+              </Button>
+            </div>
+          )}
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Login</TabsTrigger>
