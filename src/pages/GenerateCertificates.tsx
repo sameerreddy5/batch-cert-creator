@@ -183,10 +183,25 @@ export const GenerateCertificates = () => {
 
       if (certificatesError) throw certificatesError;
 
-      toast({
-        title: 'Success',
-        description: `Batch "${formData.batch_name}" created with ${certificates.length} certificates`,
-      });
+      // Trigger certificate generation
+      const { data: functionData, error: functionError } = await supabase.functions
+        .invoke('generate-certificates', {
+          body: { batchId: batch.id }
+        });
+
+      if (functionError) {
+        console.error('Function error:', functionError);
+        toast({
+          title: 'Warning',
+          description: `Batch created but certificate generation failed: ${functionError.message}`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Success',
+          description: `Batch "${formData.batch_name}" created and certificate generation started`,
+        });
+      }
 
       navigate('/history');
     } catch (error) {
